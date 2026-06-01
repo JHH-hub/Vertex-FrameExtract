@@ -1,0 +1,15 @@
+# Build outputs
+*.exe
+*.pkg
+*.spec
+build/
+dist/
+__pycache__/
+*.pyc
+
+# PyInstaller
+*.toc
+*.pyz
+warn-*.txt
+xref-*.html
+base_library.zip
