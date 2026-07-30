@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>序列帧抽帧工具</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.4/socket.io.min.js"></script>
+</head>
+<body>
+
+<div class="app">
+  <!-- 顶栏 -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <svg class="logo-icon" viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M4 4h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4zM4 10h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4zM4 16h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4z" opacity=".5"/><path fill="currentColor" d="M4 4h4v4H4zm12 6h4v4h-4zM10 16h4v4h-4z"/></svg>
+      <h1>序列帧抽帧工具</h1>
+    </div>
+    <div class="topbar-right">
+      <span class="version-tag">Web v1.0</span>
+    </div>
+  </header>
+
+  <div class="main-layout">
+    <!-- 左侧控制面板 -->
+    <aside class="sidebar">
+      <!-- 输入源 -->
+      <section class="panel">
+        <h2 class="panel-title">
+          <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+          输入源
+        </h2>
+        <div class="input-type-tabs">
+          <button class="tab active" data-type="sequence" onclick="setInputType('sequence')">序列帧文件夹</button>
+          <button class="tab" data-type="video" onclick="setInputType('video')">视频文件</button>
+        </div>
+        <div class="path-input-group">
+          <input type="text" id="inputPath" class="path-input" placeholder="粘贴路径、拖入文件或点击浏览..." 
+                 spellcheck="false" autocomplete="off">
+          <button class="btn-icon" onclick="openBrowser()" title="浏览">
+            <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+          </button>
+        </div>
+        <div id="inputInfo" class="input-info"></div>
+        <!-- 隐藏的原生文件选择器 -->
+        <input type="file" id="nativeFileInput" accept="video/*" style="display:none" onchange="handleNativeFile(this)">
+        <input type="file" id="nativeFolderInput" webkitdirectory style="display:none" onchange="handleNativeFolder(this)">
+      </section>
+
+      <!-- 抽帧模式 -->
+      <section class="panel">
+        <h2 class="panel-title">
+          <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg>
+          抽帧模式
+        </h2>
+
+        <div class="mode-options">
+          <label class="mode-card active" data-mode="fixed" onclick="setMode('fixed')">
+            <input type="radio" name="mode" value="fixed" checked>
+            <div class="mode-card-body">
+              <span class="mode-name">固定间隔</span>
+              <span class="mode-desc">每 N 帧抽 1 帧</span>
+            </div>
+          </label>
+          <label class="mode-card" data-mode="custom" onclick="setMode('custom')">
+            <input type="radio" name="mode" value="custom">
+            <div class="mode-card-body">
+              <span class="mode-name">自定义间隔</span>
+              <span class="mode-desc">隔 X 帧抽 Y 帧</span>
+            </div>
+          </label>
+          <label class="mode-card" data-mode="smart" onclick="setMode('smart')">
+            <input type="radio" name="mode" value="smart">
+            <div class="mode-card-body">
+              <span class="mode-name">智能抽帧</span>
+              <span class="mode-badge">推荐</span>
+              <span class="mode-desc">自动保留关键帧</span>
+            </div>
+          </label>
+        </div>
+
+        <!-- 固定间隔参数 -->
+        <div class="mode-params" id="params-fixed">
+          <div class="param-row">
+            <span class="param-label">每</span>
+            <input type="number" id="interval" class="param-input" value="3" min="1" max="100">
+            <span class="param-label">帧抽 1 帧</span>
+          </div>
+        </div>
+
+        <!-- 自定义间隔参数 -->
+        <div class="mode-params hidden" id="params-custom">
+          <div class="param-row">
+            <span class="param-label">隔</span>
+            <input type="number" id="skip" class="param-input" value="2" min="1" max="100">
+            <span class="param-label">帧，抽</span>
+            <input type="number" id="take" class="param-input" value="1" min="1" max="100">
+            <span class="param-label">帧</span>
+          </div>
+        </div>
+
+        <!-- 智能抽帧参数 -->
+        <div class="mode-params hidden" id="params-smart">
+          <div class="param-row-col">
+            <div class="slider-header">
+              <span class="param-label">相似度阈值</span>
+              <span class="param-value" id="thresholdValue">5%</span>
+            </div>
+            <input type="range" id="threshold" class="slider" min="1" max="30" value="5" step="1"
+                   oninput="document.getElementById('thresholdValue').textContent = this.value + '%'">
+            <div class="slider-hints">
+              <span>极限压缩</span>
+              <span>保守模式</span>
+            </div>
+          </div>
+          <p class="hint-text">自动保留关键帧，跳过相似帧，节省空间</p>
+        </div>
+      </section>
+
+      <!-- 输出设置 -->
+      <section class="panel">
+        <h2 class="panel-title">
+          <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+          输出设置
+        </h2>
+
+        <div class="param-row-col">
+          <span class="param-label-sm">输出目录</span>
+          <div class="path-input-group compact">
+            <input type="text" id="outputPath" class="path-input" placeholder="默认: 源文件同目录/output">
+            <button class="btn-icon" onclick="openOutputBrowser()" title="浏览">
+              <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="param-row" style="gap:16px;">
+          <div class="param-row-col" style="flex:1;">
+            <span class="param-label-sm">文件前缀</span>
+            <input type="text" id="prefix" class="param-input wide" value="frame_" spellcheck="false">
+          </div>
+          <div class="param-row-col" style="flex:0 0 80px;">
+            <span class="param-label-sm">序号位数</span>
+            <input type="number" id="digits" class="param-input" value="4" min="1" max="8">
+          </div>
+        </div>
+
+        <div class="param-row-col">
+          <div class="slider-header">
+            <span class="param-label-sm">PNG 压缩级别</span>
+            <span class="param-value" id="compressionValue">6 · 平衡</span>
+          </div>
+          <input type="range" id="compression" class="slider" min="0" max="9" value="6" step="1"
+                 oninput="updateCompressionLabel(this.value)">
+          <div class="slider-hints">
+            <span>无压缩</span>
+            <span>最大压缩</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 操作按钮 -->
+      <section class="panel actions-panel">
+        <button class="btn-primary" id="btnPreview" onclick="requestPreview()">
+          <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>
+          预览抽帧效果
+        </button>
+        <button class="btn-accent" id="btnStart" onclick="startExtract()">
+          <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M5 4v2h14V4H5zm0 10h4v6h6v-6h4l-7-7-7 7z"/></svg>
+          开始处理
+        </button>
+        <button class="btn-cancel hidden" id="btnCancel" onclick="cancelExtract()">取消</button>
+      </section>
+    </aside>
+
+    <!-- 右侧预览区 -->
+    <main class="content">
+      <!-- 预览播放器 -->
+      <div class="preview-area" id="previewArea">
+        <div class="preview-empty" id="previewEmpty">
+          <div class="drop-zone" id="dropZone">
+            <svg viewBox="0 0 24 24" width="48" height="48"><path fill="currentColor" d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+            <p class="drop-zone-title">拖入视频文件或序列帧文件夹</p>
+            <p class="drop-zone-hint">也可以粘贴路径到左侧输入框，或点击下方按钮选择</p>
+            <div class="drop-zone-actions">
+              <button class="btn-sm" onclick="document.getElementById('nativeFolderInput').click()">选择文件夹</button>
+              <button class="btn-sm" onclick="document.getElementById('nativeFileInput').click()">选择视频文件</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 预览播放器 -->
+        <div class="player-container hidden" id="playerContainer">
+          <div class="player-header">
+            <div class="player-tabs">
+              <button class="player-tab active" data-view="compare" onclick="setPlayerView('compare')">对比预览</button>
+              <button class="player-tab" data-view="original" onclick="setPlayerView('original')">原始帧</button>
+              <button class="player-tab" data-view="extracted" onclick="setPlayerView('extracted')">抽帧后</button>
+            </div>
+            <div class="player-stats" id="playerStats"></div>
+          </div>
+
+          <!-- 对比模式 -->
+          <div class="player-view" id="view-compare">
+            <div class="compare-players">
+              <div class="compare-col">
+                <div class="compare-label">原始 · <span id="originalCountLabel">0</span> 帧</div>
+                <div class="player-canvas-wrap">
+                  <img id="canvasOriginal" class="player-canvas" alt="">
+                </div>
+              </div>
+              <div class="compare-col">
+                <div class="compare-label">抽帧后 · <span id="extractedCountLabel">0</span> 帧</div>
+                <div class="player-canvas-wrap">
+                  <img id="canvasExtracted" class="player-canvas" alt="">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 单独原始帧 -->
+          <div class="player-view hidden" id="view-original">
+            <div class="player-canvas-wrap large">
+              <img id="canvasSingleOriginal" class="player-canvas" alt="">
+            </div>
+          </div>
+
+          <!-- 单独抽帧后 -->
+          <div class="player-view hidden" id="view-extracted">
+            <div class="player-canvas-wrap large">
+              <img id="canvasSingleExtracted" class="player-canvas" alt="">
+            </div>
+          </div>
+
+          <!-- 播放控制 -->
+          <div class="player-controls">
+            <button class="ctrl-btn" onclick="playerPrev()" title="上一帧">
+              <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+            </button>
+            <button class="ctrl-btn play-btn" id="btnPlay" onclick="togglePlay()" title="播放/暂停">
+              <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" id="playPauseIcon" d="M8 5v14l11-7z"/></svg>
+            </button>
+            <button class="ctrl-btn" onclick="playerNext()" title="下一帧">
+              <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+            </button>
+            <div class="timeline-wrap">
+              <input type="range" id="timeline" class="timeline" min="0" max="100" value="0"
+                     oninput="seekFrame(this.value)">
+            </div>
+            <span class="frame-counter" id="frameCounter">0 / 0</span>
+            <div class="speed-control">
+              <label>FPS</label>
+              <input type="number" id="playFps" class="param-input tiny" value="12" min="1" max="60">
+            </div>
+          </div>
+
+          <!-- 帧时间线缩略图 -->
+          <div class="timeline-thumbnails" id="timelineThumbs"></div>
+        </div>
+      </div>
+
+      <!-- 进度条 -->
+      <div class="progress-section hidden" id="progressSection">
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="progressFill" style="width:0%"></div>
+        </div>
+        <div class="progress-info">
+          <span id="progressText">就绪</span>
+          <span id="progressPercent">0%</span>
+        </div>
+      </div>
+
+      <!-- 缩略图条（分析后显示） -->
+      <div class="thumb-strip hidden" id="thumbStrip">
+        <h3 class="thumb-strip-title">输入帧概览</h3>
+        <div class="thumb-strip-scroll" id="thumbStripScroll"></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- 文件浏览器模态框 -->
+<div class="modal-overlay hidden" id="browserModal">
+  <div class="modal browser-modal">
+    <div class="modal-header">
+      <h3 id="browserTitle">选择文件夹</h3>
+      <button class="modal-close" onclick="closeBrowser()">&times;</button>
+    </div>
+    <div class="browser-toolbar">
+      <button class="btn-sm" onclick="browserUp()">↑ 上级</button>
+      <input type="text" id="browserPath" class="path-input" spellcheck="false"
+             onkeydown="if(event.key==='Enter')browserNavigate(this.value)">
+    </div>
+    <div class="browser-drives" id="browserDrives"></div>
+    <div class="browser-list" id="browserList"></div>
+    <div class="modal-footer">
+      <button class="btn-sm" onclick="closeBrowser()">取消</button>
+      <button class="btn-primary-sm" onclick="browserConfirm()">选择当前目录</button>
+    </div>
+  </div>
+</div>
+
+<!-- 完成模态框 -->
+<div class="modal-overlay hidden" id="doneModal">
+  <div class="modal done-modal">
+    <div class="done-icon">✓</div>
+    <h3>处理完成</h3>
+    <div class="done-stats" id="doneStats"></div>
+    <div class="done-actions">
+      <button class="btn-primary-sm" onclick="openOutputFolder()">打开输出目录</button>
+      <button class="btn-sm" onclick="closeDoneModal()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
