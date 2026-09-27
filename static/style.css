@@ -512,3 +512,71 @@ button{cursor:pointer;border:none;background:none}
   animation:spin .6s linear infinite;
 }
 @keyframes spin{to{transform:rotate(360deg)}}
+
+
+/* =============== Format tabs =============== */
+.format-tabs{
+  display:flex;gap:4px;
+}
+.format-tab{
+  flex:1;padding:6px 4px;
+  font-size:11px;font-weight:500;
+  background:var(--bg-input);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  color:var(--text-secondary);
+  cursor:pointer;
+  transition:all .15s;
+  text-align:center;
+}
+.format-tab:hover{border-color:var(--border-light);color:var(--text-primary)}
+.format-tab.active{
+  background:var(--accent);
+  border-color:var(--accent);
+  color:#fff;
+}
+
+/* =============== Estimate result =============== */
+.estimate-result{margin-top:8px}
+.estimate-grid{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:6px;
+}
+.estimate-item{
+  background:var(--bg-input);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:8px 6px;text-align:center;
+  cursor:pointer;transition:all .15s;
+}
+.estimate-item:hover{border-color:var(--border-light)}
+.estimate-item.active{border-color:var(--accent);background:rgba(99,102,241,.08)}
+.est-label{font-size:10px;color:var(--text-muted);margin-bottom:4px}
+.est-size{font-size:13px;font-weight:600;color:var(--text-primary)}
+.est-saving{font-size:11px;color:#10b981;margin-top:2px}
+.est-saving.baseline{color:var(--text-muted)}
+
+/* =============== Format group label =============== */
+.format-group-label{
+  font-size:10px;color:var(--text-muted);
+  margin:8px 0 4px;letter-spacing:.5px;
+}
+.format-group-label:first-child{margin-top:0}
+
+/* =============== Estimate extras =============== */
+.est-baseline{
+  font-size:11px;color:var(--text-muted);
+  margin-bottom:6px;
+}
+.est-warn{color:#f59e0b}
+.estimate-grid{grid-template-columns:repeat(5,1fr)}
+.estimate-item.lossless{border-left:2px solid #10b981}
+.est-quality{font-size:9px;margin-top:3px;color:var(--text-muted)}
+.est-quality.lossless{color:#10b981;font-weight:600}
+.est-quality.good{color:#10b981}
+.est-quality.ok{color:#f59e0b}
+.est-quality.bad{color:#ef4444}
+.est-saving.worse{color:#ef4444}
+.est-hint{
+  font-size:10px;color:var(--text-muted);
+  margin-top:6px;line-height:1.5;
+}

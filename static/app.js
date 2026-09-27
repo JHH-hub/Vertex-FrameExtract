@@ -4,6 +4,7 @@ const state = {
   inputPath: '',
   outputPath: '',
   mode: 'fixed',
+  format: 'png',
   analysisData: null,
   previewData: null,
   // Player
@@ -43,8 +44,101 @@ function setMode(mode) {
 
 // ============ Compression label ============
 function updateCompressionLabel(val) {
-  const labels = {0:'无压缩',1:'1',2:'2',3:'3',4:'4',5:'快速',6:'平衡',7:'7',8:'8',9:'最大'};
+  const labels = {0:'最快',1:'快速',2:'较快',3:'标准',4:'平衡',5:'强',6:'极限'};
   document.getElementById('compressionValue').textContent = val + ' · ' + (labels[val]||val);
+}
+
+// ============ Format ============
+function setFormat(fmt) {
+  state.format = fmt;
+  document.querySelectorAll('.format-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.fmt === fmt);
+  });
+  // oxipng level applies to png / pngq only
+  const usesOxipng = (fmt === 'png' || fmt === 'pngq');
+  document.getElementById('opt-png-compress').classList.toggle('hidden', !usesOxipng);
+  document.getElementById('opt-colors').classList.toggle('hidden', fmt !== 'pngq');
+  document.getElementById('opt-quality').classList.toggle('hidden', fmt !== 'webp' && fmt !== 'jpeg');
+}
+
+// ============ Estimate ============
+async function requestEstimate() {
+  const path = document.getElementById('inputPath').value.trim();
+  if (!path) { alert('请先输入路径'); return; }
+
+  const btn = document.getElementById('btnEstimate');
+  const resultEl = document.getElementById('estimateResult');
+  btn.disabled = true;
+  btn.textContent = '测试中...';
+
+  try {
+    const res = await fetch('/api/estimate', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        input_type: state.inputType,
+        input_path: path,
+        params: {
+          quality: parseInt(document.getElementById('quality').value) || 85,
+          colors: parseInt(document.getElementById('colors').value) || 256,
+          oxipng_level: parseInt(document.getElementById('compression').value)
+        }
+      })
+    });
+    const data = await res.json();
+    if (data.error) {
+      resultEl.textContent = '测试失败: ' + data.error;
+      resultEl.classList.remove('hidden');
+      return;
+    }
+
+    const formats = data.formats || {};
+    let html = '';
+    html += `<div class="est-baseline">原图 ${data.baseline_kb} KB`;
+    if (data.has_oxipng === false) {
+      html += ` · <span class="est-warn">oxipng 未安装</span>`;
+    }
+    html += '</div>';
+
+    html += '<div class="estimate-grid">';
+    const order = ['png', 'webpl', 'pngq', 'webp', 'jpeg'];
+    for (const key of order) {
+      const item = formats[key];
+      if (!item || item.size_kb < 0) continue;
+      const saving = item.saving || 0;
+      const active = key === state.format ? ' active' : '';
+      const tag = item.lossless ? ' lossless' : '';
+      html += `<div class="estimate-item${active}${tag}" onclick="setFormat('${key}')">`;
+      html += `<div class="est-label">${item.label}</div>`;
+      html += `<div class="est-size">${item.size_kb} KB</div>`;
+      if (saving > 0) {
+        html += `<div class="est-saving">-${saving}%</div>`;
+      } else if (saving < 0) {
+        html += `<div class="est-saving worse">+${Math.abs(saving)}%</div>`;
+      } else {
+        html += `<div class="est-saving baseline">持平</div>`;
+      }
+      if (item.lossless) {
+        html += `<div class="est-quality lossless">画质无损</div>`;
+      } else if (item.psnr) {
+        const grade = item.psnr >= 45 ? 'good' : (item.psnr >= 38 ? 'ok' : 'bad');
+        html += `<div class="est-quality ${grade}">PSNR ${item.psnr}</div>`;
+      } else {
+        html += `<div class="est-quality"></div>`;
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+    html += '<div class="est-hint">PSNR &gt; 45 dB 肉眼几乎不可分辨，&gt; 40 dB 为高质量</div>';
+    resultEl.innerHTML = html;
+    resultEl.classList.remove('hidden');
+  } catch (e) {
+    resultEl.textContent = '请求失败';
+    resultEl.classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '测试压缩效果';
+  }
 }
 
 // ============ Gather params ============
@@ -52,7 +146,11 @@ function gatherParams() {
   const p = {
     prefix: document.getElementById('prefix').value || 'frame_',
     digits: parseInt(document.getElementById('digits').value) || 4,
-    compression: parseInt(document.getElementById('compression').value)
+    compression: parseInt(document.getElementById('compression').value),
+    oxipng_level: parseInt(document.getElementById('compression').value),
+    format: state.format,
+    quality: parseInt(document.getElementById('quality').value) || 85,
+    colors: parseInt(document.getElementById('colors').value) || 256
   };
   if (state.mode === 'fixed') {
     p.interval = parseInt(document.getElementById('interval').value) || 3;
@@ -353,9 +451,11 @@ socket.on('complete', data => {
   const statsHtml = `
     <div><b>输入帧数:</b> ${data.total_input}</div>
     <div><b>输出帧数:</b> ${data.total_output}</div>
-    <div><b>压缩率:</b> ${data.compression_rate}%</div>
+    <div><b>帧压缩率:</b> ${data.compression_rate}%</div>
+    ${data.output_format ? `<div><b>输出格式:</b> ${data.output_format.toUpperCase()}</div>` : ''}
     ${data.size_input_mb ? `<div><b>原始大小:</b> ${data.size_input_mb} MB</div>` : ''}
     ${data.size_output_mb ? `<div><b>输出大小:</b> ${data.size_output_mb} MB</div>` : ''}
+    ${data.file_compression_rate ? `<div><b>文件体积节省:</b> ${data.file_compression_rate}%</div>` : ''}
     <div style="margin-top:8px;color:var(--text-muted);font-size:11px">${data.output_dir || ''}</div>
   `;
   document.getElementById('doneStats').innerHTML = statsHtml;

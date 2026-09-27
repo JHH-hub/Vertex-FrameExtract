@@ -146,17 +146,68 @@
         </div>
 
         <div class="param-row-col">
-          <div class="slider-header">
-            <span class="param-label-sm">PNG 压缩级别</span>
-            <span class="param-value" id="compressionValue">6 · 平衡</span>
+          <span class="param-label-sm">输出格式</span>
+          <div class="format-group-label">无损 · 画质零损失</div>
+          <div class="format-tabs" id="formatTabsLossless">
+            <button class="format-tab active" data-fmt="png" onclick="setFormat('png')">PNG 无损</button>
+            <button class="format-tab" data-fmt="webpl" onclick="setFormat('webpl')">WebP 无损</button>
           </div>
-          <input type="range" id="compression" class="slider" min="0" max="9" value="6" step="1"
-                 oninput="updateCompressionLabel(this.value)">
-          <div class="slider-hints">
-            <span>无压缩</span>
-            <span>最大压缩</span>
+          <div class="format-group-label">有损 · 体积更小</div>
+          <div class="format-tabs" id="formatTabsLossy">
+            <button class="format-tab" data-fmt="pngq" onclick="setFormat('pngq')">PNG 量化</button>
+            <button class="format-tab" data-fmt="webp" onclick="setFormat('webp')">WebP</button>
+            <button class="format-tab" data-fmt="jpeg" onclick="setFormat('jpeg')">JPEG</button>
           </div>
         </div>
+
+        <!-- oxipng optimization level (png & pngq) -->
+        <div class="param-row-col format-opt" id="opt-png-compress">
+          <div class="slider-header">
+            <span class="param-label-sm">无损优化强度</span>
+            <span class="param-value" id="compressionValue">4 · 平衡</span>
+          </div>
+          <input type="range" id="compression" class="slider" min="0" max="6" value="4" step="1"
+                 oninput="updateCompressionLabel(this.value)">
+          <div class="slider-hints">
+            <span>快速</span>
+            <span>极限（慢）</span>
+          </div>
+          <p class="hint-text">oxipng 重新编码 DEFLATE 流，像素完全不变</p>
+        </div>
+
+        <!-- Color count (pngq only) -->
+        <div class="param-row-col format-opt hidden" id="opt-colors">
+          <div class="slider-header">
+            <span class="param-label-sm">量化颜色数</span>
+            <span class="param-value" id="colorsValue">256</span>
+          </div>
+          <input type="range" id="colors" class="slider" min="16" max="256" value="256" step="8"
+                 oninput="document.getElementById('colorsValue').textContent = this.value">
+          <div class="slider-hints">
+            <span>16 色 (极限)</span>
+            <span>256 色 (最佳)</span>
+          </div>
+        </div>
+
+        <!-- Quality (webp & jpeg) -->
+        <div class="param-row-col format-opt hidden" id="opt-quality">
+          <div class="slider-header">
+            <span class="param-label-sm">质量</span>
+            <span class="param-value" id="qualityValue">85</span>
+          </div>
+          <input type="range" id="quality" class="slider" min="10" max="100" value="85" step="5"
+                 oninput="document.getElementById('qualityValue').textContent = this.value">
+          <div class="slider-hints">
+            <span>小体积</span>
+            <span>高质量</span>
+          </div>
+        </div>
+
+        <!-- Estimate button -->
+        <button class="btn-sm" id="btnEstimate" onclick="requestEstimate()" style="margin-top:6px;width:100%">
+          测试压缩效果
+        </button>
+        <div id="estimateResult" class="estimate-result hidden"></div>
       </section>
 
       <!-- 操作按钮 -->
